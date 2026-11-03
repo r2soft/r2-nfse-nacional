@@ -104,6 +104,30 @@ class NfseNacionalServiceTest extends TestCase
         $this->assertStringNotContainsString(NfseNacionalService::SEM_RESPOSTA, $r['mensagem']);
     }
 
+    public function testEsquemaNovoDaSefinReenviaUmaVezNoLeiauteDaReforma(): void
+    {
+        $r = $this->servico([
+            [400, ['erros' => [['Codigo' => 'E1235', 'Descricao' => 'Falha no esquema XML do DF-e.',
+                'Complemento' => "The element 'infDPS' has invalid child element 'cLocEmi'. List of possible elements expected: 'cMotivoEmisTI, finNFSe'."]]]],
+            [201, ['chaveAcesso' => self::CHAVE, 'nfseXmlGZipB64' => self::nfseGzip('3904')]],
+        ])->emitir(self::config(), DpsTest::dados());
+
+        $this->assertTrue($r['sucesso']);
+        $this->assertSame('3904', $r['numero_nfse']);
+        $this->assertCount(2, $this->sefin->chamadas);
+        $this->assertStringContainsString('<finNFSe>0</finNFSe>', $r['xml_envio']);
+        $this->assertStringNotContainsString('<cNBS>', $r['xml_envio']);
+    }
+
+    public function testOutroErroDeEsquemaNaoReenvia(): void
+    {
+        $r = $this->servico([[400, ['erros' => [['Codigo' => 'E1235', 'Descricao' => 'Falha no esquema XML do DF-e.', 'Complemento' => 'xNome inválido']]]]])
+            ->emitir(self::config(), DpsTest::dados());
+
+        $this->assertFalse($r['sucesso']);
+        $this->assertCount(1, $this->sefin->chamadas);
+    }
+
     public function testCertificadoRecusadoSemCorpoEhConclusivo(): void
     {
         $r = $this->servico([[403, null]])->emitir(self::config(), DpsTest::dados());

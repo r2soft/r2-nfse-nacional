@@ -6,6 +6,9 @@ namespace R2soft\NfseNacional;
  * DPS 1.01 (sem assinatura) a partir do $dadosRps do consumer.
  * Conteúdo e ordem dos campos seguem a NFS-e 3850 de Jaraguá/GO, aceita pela Sefin em 2026.
  * Só Simples Nacional ME/EPP com ISS não retido: o resto não foi validado e é recusado.
+ *
+ * $leiauteRtc = esquema da reforma tributária, já ativo na produção restrita em 11/2026:
+ * exige finNFSe depois de tpEmit e não aceita cNBS dentro de cServ. A produção ainda usa o atual.
  */
 final class Dps
 {
@@ -24,7 +27,7 @@ final class Dps
             . str_pad(ltrim(self::digitos($numero), '0'), 15, '0', STR_PAD_LEFT);
     }
 
-    public static function xml(array $d, string $ambiente, \DateTimeImmutable $agora): string
+    public static function xml(array $d, string $ambiente, \DateTimeImmutable $agora, bool $leiauteRtc = false): string
     {
         if ((int) ($d['optante_simples_nacional'] ?? 0) !== 1) {
             throw new NfseNacionalException('Padrão nacional só suportado para Simples Nacional ME/EPP (optante pelo Simples = 1).');
@@ -60,6 +63,9 @@ final class Dps
         self::el($inf, 'nDPS', $numero);
         self::el($inf, 'dCompet', substr((string) ($d['competencia'] ?? ''), 0, 10));
         self::el($inf, 'tpEmit', '1');
+        if ($leiauteRtc) {
+            self::el($inf, 'finNFSe', '0');
+        }
         self::el($inf, 'cLocEmi', $municipio);
 
         $prest = self::el($inf, 'prest');
@@ -100,7 +106,7 @@ final class Dps
         self::el($cServ, 'cTribNac', $cTribNac);
         self::el($cServ, 'xDescServ', self::texto($d['discriminacao'] ?? '', 2000) ?: 'Prestação de serviços');
         $nbs = self::digitos((string) ($d['numero_nbs'] ?? ''));
-        if ($nbs !== '') {
+        if ($nbs !== '' && !$leiauteRtc) {
             self::el($cServ, 'cNBS', $nbs);
         }
 

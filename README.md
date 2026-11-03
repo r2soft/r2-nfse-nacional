@@ -15,6 +15,7 @@ $r = $service->emitir(
 ```
 
 - `mensagem` começando por `Sem resposta da Sefin:` quer dizer que a nota pode ter saído. Antes de gravar erro, chame `consultar()` com `numero_rps`, `serie`, `codigo_municipio`, `prestador_cpf_cnpj` e `prestador_tipo`.
+- Esquema da reforma tributária: se a Sefin recusar com E1235 pedindo `finNFSe`, a DPS é reenviada uma vez no leiaute novo (com `finNFSe`, sem `cNBS`). Em 11/2026 a produção restrita já usa esse esquema e a produção ainda não.
 - Por enquanto só Simples Nacional ME/EPP com ISS não retido. Outros casos lançam `NfseNacionalException`.
 - `ambiente`: `prod` usa sefin.nfse.gov.br; qualquer outro valor usa a produção restrita.
 - Link público da nota: `https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave={chave}`.

@@ -116,6 +116,22 @@ class DpsTest extends TestCase
         $this->assertNull(self::valor(self::xml(['numero_nbs' => '']), '//n:cNBS'));
     }
 
+    public function testLeiauteDaReformaTributariaLevaFinNFSeESemCNBS(): void
+    {
+        $doc = new \DOMDocument();
+        $doc->loadXML(Dps::xml(self::dados(), 'hom', new \DateTimeImmutable(self::AGORA), true));
+        $xp = new \DOMXPath($doc);
+        $xp->registerNamespace('n', Dps::NS);
+
+        $filhos = [];
+        foreach ($xp->query('/n:DPS/n:infDPS')->item(0)->childNodes as $n) {
+            $filhos[] = $n->localName;
+        }
+        $this->assertSame(['tpAmb', 'dhEmi', 'verAplic', 'serie', 'nDPS', 'dCompet', 'tpEmit', 'finNFSe', 'cLocEmi', 'prest', 'toma', 'serv', 'valores'], $filhos);
+        $this->assertSame('0', self::valor($xp, '//n:finNFSe'));
+        $this->assertNull(self::valor($xp, '//n:cNBS'));
+    }
+
     public function testRecusaEmpresaForaDoSimples(): void
     {
         $this->expectException(NfseNacionalException::class);

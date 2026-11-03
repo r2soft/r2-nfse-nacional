@@ -32,11 +32,19 @@ class NfseNacionalService
     {
         $ambiente = (string) ($config['ambiente'] ?? 'hom');
         [$pfx, $senha] = self::certificado($config);
-        $xmlEnvio = (new AssinadorXml($pfx, $senha))->assinar(Dps::xml($dados, $ambiente, ($this->relogio)()));
-        $cliente  = ($this->fabricaCliente)($ambiente, $pfx, $senha);
+        $assinador = new AssinadorXml($pfx, $senha);
+        $agora     = ($this->relogio)();
+        $xmlEnvio  = $assinador->assinar(Dps::xml($dados, $ambiente, $agora));
+        $cliente   = ($this->fabricaCliente)($ambiente, $pfx, $senha);
 
         try {
             [$status, $json] = $cliente->enviarDps($xmlEnvio);
+            // Sefin já no esquema da reforma tributária: a DPS foi recusada (não virou nota),
+            // então reenviar uma vez, com o mesmo Id, no leiaute novo.
+            if (self::pedeLeiauteRtc($status, $json)) {
+                $xmlEnvio = $assinador->assinar(Dps::xml($dados, $ambiente, $agora, true));
+                [$status, $json] = $cliente->enviarDps($xmlEnvio);
+            }
         } catch (SefinSemResposta $e) {
             return self::falha($xmlEnvio, self::SEM_RESPOSTA . $e->getMessage());
         }
@@ -130,6 +138,22 @@ class NfseNacionalService
         }
         $no = $doc->getElementsByTagNameNS(Dps::NS, 'nNFSe')->item(0);
         return $no ? trim($no->textContent) : null;
+    }
+
+    /** E1235 (esquema) apontando finNFSe: a Sefin já valida pelo leiaute da reforma tributária. */
+    private static function pedeLeiauteRtc(int $status, ?array $json): bool
+    {
+        if ($status !== 400) {
+            return false;
+        }
+        foreach ($json['erros'] ?? $json['Erros'] ?? [] as $e) {
+            $codigo = $e['Codigo'] ?? $e['codigo'] ?? '';
+            $texto  = ($e['Complemento'] ?? $e['complemento'] ?? '') . ' ' . ($e['Descricao'] ?? $e['descricao'] ?? '');
+            if ($codigo === 'E1235' && strpos($texto, 'finNFSe') !== false) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static function mensagemErros(array $erros): string
