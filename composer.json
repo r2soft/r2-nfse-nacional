@@ -1,0 +1,28 @@
+{
+    "name": "r2soft/nfse-nacional",
+    "description": "Emissão de NFS-e pelo padrão nacional (API Sefin Nacional): DPS 1.01 assinada, mTLS",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": ">=7.4",
+        "ext-curl": "*",
+        "ext-dom": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-openssl": "*",
+        "ext-zlib": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "R2soft\\NfseNacional\\": "src/"
+        }
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6 || ^10.5"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "R2soft\\NfseNacional\\Tests\\": "tests/"
+        }
+    }
+}
