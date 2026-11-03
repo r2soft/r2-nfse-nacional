@@ -186,4 +186,86 @@ class NfseNacionalServiceTest extends TestCase
         $r = $this->servico([[500, null]])->consultar(self::config(), self::dadosConsulta());
         $this->assertNull($r['encontrada']);
     }
+
+    private static function dadosCancelamento(): array
+    {
+        return ['chave' => self::CHAVE, 'prestador_cpf_cnpj' => '11222333000181', 'motivo_codigo' => 1, 'motivo_texto' => 'Nota emitida com dados incorretos'];
+    }
+
+    private static function eventoGzip(): string
+    {
+        return base64_encode(gzencode('<pedRegEvento xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.01"><infPedReg Id="PRE' . self::CHAVE . '101101"><chNFSe>' . self::CHAVE . '</chNFSe></infPedReg></pedRegEvento>'));
+    }
+
+    public function testCancelamentoAceitoDevolveXmlDoEvento(): void
+    {
+        $r = $this->servico([[201, ['eventoXmlGZipB64' => self::eventoGzip()]]])
+            ->cancelar(self::config(), self::dadosCancelamento());
+
+        $this->assertTrue($r['sucesso']);
+        $this->assertStringContainsString('<pedRegEvento', $r['xml_retorno']);
+        $this->assertStringContainsString('<Signature', $r['xml_envio']);
+        $this->assertNull($r['mensagem']);
+
+        [$metodo, $caminho, $corpo] = $this->sefin->chamadas[0];
+        $this->assertSame(['POST', '/nfse/' . self::CHAVE . '/eventos'], [$metodo, $caminho]);
+        $this->assertSame($r['xml_envio'], gzdecode(base64_decode(json_decode($corpo, true)['pedidoRegistroEventoXmlGZipB64'])));
+    }
+
+    public function testChaveComMascaraVaiLimpaParaAUrl(): void
+    {
+        $dados = ['chave' => implode(' ', str_split(self::CHAVE, 10))] + self::dadosCancelamento();
+        $this->servico([[201, ['eventoXmlGZipB64' => self::eventoGzip()]]])->cancelar(self::config(), $dados);
+        $this->assertSame('/nfse/' . self::CHAVE . '/eventos', $this->sefin->chamadas[0][1]);
+    }
+
+    public function testCancelamentoRecusadoComErroLista(): void
+    {
+        $r = $this->servico([[400, ['erro' => [
+            ['codigo' => 'E1831', 'descricao' => 'O evento não pode ser recepcionado pois a NFS-e indicada não existe no Ambiente de Dados Nacional NFS-e.'],
+        ]]]])->cancelar(self::config(), self::dadosCancelamento());
+
+        $this->assertFalse($r['sucesso']);
+        $this->assertSame('E1831 – O evento não pode ser recepcionado pois a NFS-e indicada não existe no Ambiente de Dados Nacional NFS-e.', $r['mensagem']);
+        $this->assertStringNotContainsString(NfseNacionalService::SEM_RESPOSTA, $r['mensagem']);
+    }
+
+    public function testCancelamentoRecusadoComErroObjetoUnico(): void
+    {
+        $r = $this->servico([[400, ['erro' => ['codigo' => 'E1832', 'descricao' => 'O evento de cancelamento não é permitido para esta NFS-e.']]]])
+            ->cancelar(self::config(), self::dadosCancelamento());
+
+        $this->assertFalse($r['sucesso']);
+        $this->assertSame('E1832 – O evento de cancelamento não é permitido para esta NFS-e.', $r['mensagem']);
+    }
+
+    public function testCancelamentoRecusadoSemErrosNoCorpo(): void
+    {
+        $r = $this->servico([[403, null]])->cancelar(self::config(), self::dadosCancelamento());
+        $this->assertSame('Sefin recusou o cancelamento: HTTP 403', $r['mensagem']);
+    }
+
+    public function testCancelamentoSemRespostaEhInconclusivo(): void
+    {
+        $r = $this->servico([new SefinSemResposta('Operation timed out after 40000 milliseconds')])
+            ->cancelar(self::config(), self::dadosCancelamento());
+        $this->assertFalse($r['sucesso']);
+        $this->assertStringStartsWith('Sem resposta da Sefin: ', $r['mensagem']);
+
+        $r = $this->servico([[502, null]])->cancelar(self::config(), self::dadosCancelamento());
+        $this->assertSame('Sem resposta da Sefin: HTTP 502', $r['mensagem']);
+    }
+
+    public function testEmissaoRecusadaAceitaErroSingularListaEObjetoUnico(): void
+    {
+        $r = $this->servico([[400, ['erro' => [['codigo' => 'E0188', 'descricao' => 'CNPJ do tomador informado na DPS é inválido.']]]]])
+            ->emitir(self::config(), DpsTest::dados());
+        $this->assertFalse($r['sucesso']);
+        $this->assertSame('E0188 – CNPJ do tomador informado na DPS é inválido.', $r['mensagem']);
+
+        $r = $this->servico([[400, ['erro' => ['codigo' => 'E0188', 'descricao' => 'CNPJ do tomador informado na DPS é inválido.']]]])
+            ->emitir(self::config(), DpsTest::dados());
+        $this->assertFalse($r['sucesso']);
+        $this->assertSame('E0188 – CNPJ do tomador informado na DPS é inválido.', $r['mensagem']);
+    }
 }

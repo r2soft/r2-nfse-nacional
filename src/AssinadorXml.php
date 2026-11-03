@@ -2,7 +2,7 @@
 
 namespace R2soft\NfseNacional;
 
-/** Assinatura XMLDSig do infDPS: enveloped, RSA-SHA256, C14N, certificado no KeyInfo. */
+/** Assinatura XMLDSig enveloped (infDPS por padrão, ou outro elemento): RSA-SHA256, C14N, certificado no KeyInfo. */
 final class AssinadorXml
 {
     private const C14N = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
@@ -21,14 +21,14 @@ final class AssinadorXml
         $this->certificado = preg_replace('/-----[^-]+-----|\s/', '', $certs['cert']);
     }
 
-    public function assinar(string $xmlDps): string
+    public function assinar(string $xmlDps, string $elemento = 'infDPS'): string
     {
         $doc = new \DOMDocument('1.0', 'UTF-8');
         $doc->preserveWhiteSpace = false;
         $doc->loadXML($xmlDps);
-        $inf = $doc->getElementsByTagNameNS(Dps::NS, 'infDPS')->item(0);
+        $inf = $doc->getElementsByTagNameNS(Dps::NS, $elemento)->item(0);
         if (!$inf) {
-            throw new NfseNacionalException('XML sem infDPS para assinar.');
+            throw new NfseNacionalException("XML sem {$elemento} para assinar.");
         }
 
         $digest     = base64_encode(hash('sha256', $inf->C14N(), true));

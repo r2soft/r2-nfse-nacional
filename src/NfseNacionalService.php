@@ -62,7 +62,7 @@ class NfseNacionalService
             ];
         }
         if ($status >= 400 && $status < 500) {
-            $erros = $json['erros'] ?? $json['Erros'] ?? null;
+            $erros = self::errosDe($json);
             return self::falha(
                 $xmlEnvio,
                 $erros ? self::mensagemErros($erros) : "Sefin recusou a requisição: HTTP {$status}",
@@ -70,6 +70,50 @@ class NfseNacionalService
             );
         }
         return self::falha($xmlEnvio, self::SEM_RESPOSTA . "HTTP {$status}");
+    }
+
+    public function cancelar(array $config, array $dados): array
+    {
+        $ambiente = (string) ($config['ambiente'] ?? 'hom');
+        [$pfx, $senha] = self::certificado($config);
+        $agora    = ($this->relogio)();
+        $chave    = preg_replace('/\D/', '', (string) ($dados['chave'] ?? ''));
+        $xml      = PedidoCancelamento::xml(
+            $chave,
+            (string) ($dados['prestador_cpf_cnpj'] ?? ''),
+            (int) ($dados['motivo_codigo'] ?? 0),
+            (string) ($dados['motivo_texto'] ?? ''),
+            $ambiente,
+            $agora
+        );
+        $assinado = (new AssinadorXml($pfx, $senha))->assinar($xml, 'infPedReg');
+        $cliente  = ($this->fabricaCliente)($ambiente, $pfx, $senha);
+
+        try {
+            [$status, $json] = $cliente->registrarEvento($chave, $assinado);
+        } catch (SefinSemResposta $e) {
+            return self::cancelamento(false, $assinado, '', self::SEM_RESPOSTA . $e->getMessage());
+        }
+
+        if ($status >= 200 && $status < 300) {
+            $xmlEvento = self::xmlEvento($json);
+            return self::cancelamento(
+                true,
+                $assinado,
+                $xmlEvento !== null ? $xmlEvento : (string) json_encode($json, JSON_UNESCAPED_UNICODE),
+                null
+            );
+        }
+        if ($status >= 400 && $status < 500) {
+            $erros = self::errosDe($json);
+            return self::cancelamento(
+                false,
+                $assinado,
+                $json !== null ? json_encode($json, JSON_UNESCAPED_UNICODE) : '',
+                $erros ? self::mensagemErros($erros) : "Sefin recusou o cancelamento: HTTP {$status}"
+            );
+        }
+        return self::cancelamento(false, $assinado, '', self::SEM_RESPOSTA . "HTTP {$status}");
     }
 
     public function consultar(array $config, array $dados): array
@@ -123,11 +167,35 @@ class NfseNacionalService
 
     private static function xmlNfse(?array $json): ?string
     {
-        if (empty($json['nfseXmlGZipB64'])) {
+        return self::xmlGzip($json['nfseXmlGZipB64'] ?? null);
+    }
+
+    private static function xmlEvento(?array $json): ?string
+    {
+        return self::xmlGzip($json['eventoXmlGZipB64'] ?? null);
+    }
+
+    private static function xmlGzip(?string $b64): ?string
+    {
+        if ($b64 === null || $b64 === '') {
             return null;
         }
-        $xml = @gzdecode((string) base64_decode((string) $json['nfseXmlGZipB64'], true));
+        $xml = @gzdecode((string) base64_decode($b64, true));
         return $xml === false || $xml === '' ? null : $xml;
+    }
+
+    /**
+     * Erros de recusa da Sefin: aceita 'erros', 'Erros' e 'erro' (singular),
+     * que pode ser uma lista de erros ou um único objeto. Devolve sempre lista ou null.
+     */
+    private static function errosDe(?array $json): ?array
+    {
+        foreach (['erros', 'Erros', 'erro'] as $campo) {
+            if (isset($json[$campo]) && is_array($json[$campo]) && $json[$campo] !== []) {
+                return isset($json[$campo][0]) ? $json[$campo] : [$json[$campo]];
+            }
+        }
+        return null;
     }
 
     private static function numeroNfse(string $xml): ?string
@@ -177,6 +245,16 @@ class NfseNacionalService
             'xml_envio'          => $xmlEnvio,
             'xml_retorno'        => $xmlRetorno,
             'mensagem'           => $mensagem,
+        ];
+    }
+
+    private static function cancelamento(bool $sucesso, string $xmlEnvio, string $xmlRetorno, ?string $mensagem): array
+    {
+        return [
+            'sucesso'     => $sucesso,
+            'xml_envio'   => $xmlEnvio,
+            'xml_retorno' => $xmlRetorno,
+            'mensagem'    => $mensagem,
         ];
     }
 
