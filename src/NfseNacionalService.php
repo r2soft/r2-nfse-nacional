@@ -77,7 +77,7 @@ class NfseNacionalService
         $ambiente = (string) ($config['ambiente'] ?? 'hom');
         [$pfx, $senha] = self::certificado($config);
         $agora    = ($this->relogio)();
-        $chave    = (string) ($dados['chave'] ?? '');
+        $chave    = preg_replace('/\D/', '', (string) ($dados['chave'] ?? ''));
         $xml      = PedidoCancelamento::xml(
             $chave,
             (string) ($dados['prestador_cpf_cnpj'] ?? ''),

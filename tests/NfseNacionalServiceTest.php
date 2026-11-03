@@ -212,6 +212,13 @@ class NfseNacionalServiceTest extends TestCase
         $this->assertSame($r['xml_envio'], gzdecode(base64_decode(json_decode($corpo, true)['pedidoRegistroEventoXmlGZipB64'])));
     }
 
+    public function testChaveComMascaraVaiLimpaParaAUrl(): void
+    {
+        $dados = ['chave' => implode(' ', str_split(self::CHAVE, 10))] + self::dadosCancelamento();
+        $this->servico([[201, ['eventoXmlGZipB64' => self::eventoGzip()]]])->cancelar(self::config(), $dados);
+        $this->assertSame('/nfse/' . self::CHAVE . '/eventos', $this->sefin->chamadas[0][1]);
+    }
+
     public function testCancelamentoRecusadoComErroLista(): void
     {
         $r = $this->servico([[400, ['erro' => [
