@@ -45,6 +45,12 @@ class SefinClient
         return $this->requisitar('GET', '/nfse/' . rawurlencode($chave));
     }
 
+    /** @return array{0: int, 1: ?array} 2xx {eventoXmlGZipB64} | 4xx {erro: [...]} */
+    public function registrarEvento(string $chave, string $xmlAssinado): array
+    {
+        return $this->requisitar('POST', '/nfse/' . rawurlencode($chave) . '/eventos', json_encode(['pedidoRegistroEventoXmlGZipB64' => base64_encode(gzencode($xmlAssinado))]));
+    }
+
     /** @return array{0: int, 1: ?array} status HTTP e corpo JSON (null se não for JSON) */
     protected function requisitar(string $metodo, string $caminho, ?string $corpo = null): array
     {

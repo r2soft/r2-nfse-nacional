@@ -20,4 +20,17 @@ $r = $service->emitir(
 - `ambiente`: `prod` usa sefin.nfse.gov.br; qualquer outro valor usa a produção restrita.
 - Link público da nota: `https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave={chave}`.
 
+## Cancelamento
+
+```php
+$r = $service->cancelar(
+    ['ambiente' => 'prod', 'certificado_conteudo' => $pfxBinario, 'certificado_senha' => $senha],
+    ['chave' => $chaveAcesso, 'prestador_cpf_cnpj' => '11222333000181', 'motivo_codigo' => 1, 'motivo_texto' => 'Motivo com 15 a 255 caracteres']
+);
+// $r: sucesso, xml_envio, xml_retorno, mensagem
+```
+
+- `motivo_codigo`: 1 (Erro na Emissão), 2 (Serviço não Prestado) ou 9 (Outros). Envia o evento 101101 (`pedRegEvento` 1.01) assinado.
+- Vale a mesma regra do `Sem resposta da Sefin:` — o cancelamento pode ter sido registrado; consulte a nota antes de tratar como erro.
+
 Testes: `composer install && vendor/bin/phpunit`. Usam certificado autoassinado gerado na hora; nunca versione certificado real.
