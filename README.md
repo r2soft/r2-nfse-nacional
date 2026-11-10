@@ -33,4 +33,20 @@ $r = $service->cancelar(
 - `motivo_codigo`: 1 (Erro na Emissão), 2 (Serviço não Prestado) ou 9 (Outros). Envia o evento 101101 (`pedRegEvento` 1.01) assinado.
 - Vale a mesma regra do `Sem resposta da Sefin:` — o cancelamento pode ter sido registrado; consulte a nota antes de tratar como erro.
 
+## PDF da NFS-e (DANFSe v2.0)
+
+A API de DANFSe do ADN foi suspensa em 03/08/2026 (NT SE/CGNFS-e 008/2026 v1.02), e cada emissor gera o próprio. O PDF é montado a partir do XML da NFS-e: A4, uma página, com QR Code da consulta pública.
+
+```php
+use R2soft\NfseNacional\Danfse\DanfseGerador;
+
+$pdf = (new DanfseGerador())->gerarPdf($xmlNfse);                          // bytes "%PDF..."
+$pdf = (new DanfseGerador())->gerarPdf($xmlNfse, ['cancelada' => true]);   // marca d'água CANCELADA
+$pdf = (new DanfseGerador())->gerarPdf($xmlNfse, ['substituida' => true]); // marca d'água SUBSTITUÍDA
+```
+
+- `$xmlNfse` é o XML da NFS-e (raiz `<NFSe>` com `infNFSe`), o mesmo que vem em `xml_retorno` da emissão. XML inválido lança `NfseNacionalException`.
+- O cancelamento devolve o XML do **evento**, não o da nota. Para o PDF de uma nota cancelada, busque o XML na Sefin com `$service->xmlNfse($config, $chave)`, que devolve `null` quando a Sefin não responde.
+- Requer `ext-gd`. Usa `dompdf/dompdf` e `chillerlan/php-qrcode`. A especificação campo a campo está em `docs/danfse.md`.
+
 Testes: `composer install && vendor/bin/phpunit`. Usam certificado autoassinado gerado na hora; nunca versione certificado real.

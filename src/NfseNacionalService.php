@@ -51,7 +51,7 @@ class NfseNacionalService
 
         if ($status >= 200 && $status < 300 && !empty($json['chaveAcesso'])) {
             $chave = (string) $json['chaveAcesso'];
-            $xml   = self::xmlNfse($json) ?? self::buscarXml($cliente, $chave);
+            $xml   = self::xmlDaResposta($json) ?? self::buscarXml($cliente, $chave);
             return [
                 'sucesso'            => true,
                 'numero_nfse'        => $xml !== null ? self::numeroNfse($xml) : null,
@@ -145,6 +145,19 @@ class NfseNacionalService
         return self::consulta(true, $xml !== null ? self::numeroNfse($xml) : null, $chave, $xml, null);
     }
 
+    /**
+     * XML assinado da NFS-e pela chave de acesso (GET /nfse/{chave} na Sefin). Serve para gerar o
+     * DANFSe de nota cancelada, cujo XML guardado foi trocado pelo do evento de cancelamento.
+     *
+     * @return string|null o XML, ou null quando a Sefin não devolve a nota ou não responde
+     */
+    public function xmlNfse(array $config, string $chave): ?string
+    {
+        [$pfx, $senha] = self::certificado($config);
+        $cliente = ($this->fabricaCliente)((string) ($config['ambiente'] ?? 'hom'), $pfx, $senha);
+        return self::buscarXml($cliente, $chave);
+    }
+
     /** @return array{0: string, 1: string} */
     private static function certificado(array $config): array
     {
@@ -162,10 +175,10 @@ class NfseNacionalService
         } catch (SefinSemResposta $e) {
             return null;
         }
-        return $status === 200 && is_array($json) ? self::xmlNfse($json) : null;
+        return $status === 200 && is_array($json) ? self::xmlDaResposta($json) : null;
     }
 
-    private static function xmlNfse(?array $json): ?string
+    private static function xmlDaResposta(?array $json): ?string
     {
         return self::xmlGzip($json['nfseXmlGZipB64'] ?? null);
     }

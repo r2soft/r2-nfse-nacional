@@ -187,6 +187,21 @@ class NfseNacionalServiceTest extends TestCase
         $this->assertNull($r['encontrada']);
     }
 
+    public function testXmlNfsePelaChave(): void
+    {
+        $r = $this->servico([[200, ['chaveAcesso' => self::CHAVE, 'nfseXmlGZipB64' => self::nfseGzip('3904')]]])
+            ->xmlNfse(self::config(), self::CHAVE);
+
+        $this->assertSame('/nfse/' . self::CHAVE, $this->sefin->chamadas[0][1]);
+        $this->assertStringContainsString('<nNFSe>3904</nNFSe>', $r);
+    }
+
+    public function testXmlNfseSemNotaOuSemRespostaDevolveNull(): void
+    {
+        $this->assertNull($this->servico([[404, null]])->xmlNfse(self::config(), self::CHAVE));
+        $this->assertNull($this->servico([new SefinSemResposta('timeout')])->xmlNfse(self::config(), self::CHAVE));
+    }
+
     private static function dadosCancelamento(): array
     {
         return ['chave' => self::CHAVE, 'prestador_cpf_cnpj' => '11222333000181', 'motivo_codigo' => 1, 'motivo_texto' => 'Nota emitida com dados incorretos'];
