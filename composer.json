@@ -2,7 +2,7 @@
     "name": "r2soft/nfse-nacional",
     "description": "Emissão de NFS-e pelo padrão nacional (API Sefin Nacional): DPS 1.01 assinada, mTLS",
     "type": "library",
-    "license": "proprietary",
+    "license": "MIT",
     "require": {
         "php": ">=7.4",
         "ext-curl": "*",
